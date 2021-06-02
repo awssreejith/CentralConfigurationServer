@@ -1,0 +1,138 @@
+How to create configuration server for Microservice using Springboot and enable clients to avail the configurations
+===================================================================================================================
+
+Tutorial Link:- https://dzone.com/articles/using-spring-config-server
+
+https://www.tutorialspoint.com/spring_boot/spring_boot_cloud_configuration_client.htm
+
+https://spring.io/guides/gs/centralized-configuration/
+
+
+Step-1:- Create a Config Server service
+=======================================
+
+
+0) Add below dependency
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-config-server</artifactId>
+	</dependency>
+
+	<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-context</artifactId>
+			<version>3.0.2</version>
+	</dependency>
+		
+1) Add the annotation @EnableConfigServer in the application main file
+
+2) V:V:IMP:- Before adding the git path, first create a repository and create two files Client_One.properties and Client_Two.properties.
+The two files MUST have names as <client service name>.properties [for me two clients are Client_One and Client_Two ]
+
+Note: If you want to create seperate profiles for seperate environments [for eg:- sanity, prod, test etc] then create files like
+Client_One-sanity.properties, Client_One-prod.properties, Client_Two-sanity.properties etc
+
+3) In application.properties files add the below entries
+####################################################################################
+spring.application.name=config-server #any name for this config server
+server.port=8888
+
+##The below is repository where the configurations files for each client will be stored.
+##We can store in DB and in local folders as well
+# spring.cloud.config.server.git.uri=https://github.com/awssreejith/REST_Config_Server.git
+
+## The below is required to say my configurations are located in "main" branch. Else SB will check
+## "master" branch in git repo
+# spring.cloud.config.server.git.default-label: main
+
+## If you want to fetch properties file from a local folder than from git repo, do the below
+spring.profiles.active=native
+spring.cloud.config.server.git.uri: file:///C:\\MyStudy\\Java\\ConfigServer\\ConfigServer\\Server\\Client_Config_Files
+spring.cloud.config.server.native.searchLocations=file:/C:/MyStudy/Java/ConfigServer/ConfigServer/Server/Client_Config_Files
+## where the folder C:\MyStudy\Java\ConfigServer\ConfigServer\Server\Client_Config_Files contains the properties files [<client service name>.properties]
+
+####################################################################################
+
+4) Try to access the profiles through browser as below
+http://localhost:8888/Client_Two/default
+http://localhost:8888/Client_Two/Prod
+http://localhost:8888/Client_Two/Dev
+http://localhost:8888/Client_Two/Test
+http://localhost:8888/Client_Two/Sanity
+
+########################################################################################
+Implementing client for config server
+#########################################################################################
+0) Create a SB project 
+
+1) Add the below dependencies
+
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-context</artifactId>
+			<version>3.0.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bootstrap</artifactId>
+			<version>3.0.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+			<version>2.5.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+
+Where each dependency is as follows:-
+1.0) spring-cloud-context and spring-cloud-starter-bootstrap:- Since the configuration values inside client is stored outside the application.properties of this service,
+while service start up, the service has to fetch it from config server. Inorder to fetch any properties from outsiide world we have to
+define all the details about the config server and application's own name etc inside "bootstrap.properties" file. The bootstrap.properties
+file will be loaded when the service comes up and from that it will fetch all the details about config server and populates all the config values
+from server. Any paramaters than the service doesn't want to store in config server can still be stored in a private applications.properties file.
+Inorder to support bootstrap.properties look up we need to include this dependency in the client.
+
+1.1) spring-boot-starter-actuator:- Whenever someone chnages the properties of a client service in the server, it must be refreshed back and the new values must be propogated back to client service. Inorder to do that we include spring-boot-starter-actuator. This will provide additional actuator REST endpoints to the client service.
+Thus we can use the actuator REST end point provided for this client and send a refresh event.
+
+1.2) pring-cloud-starter-config:- Client libraries for config server
+
+
+2) V:V:IMP:- Create a new file named bootstrap.properties and add the below entries [else application won't start]
+server.port=8890
+spring.profiles.active=Prod
+spring.application.name=Client_Two
+spring.cloud.config.uri=http://localhost:8888
+management.endpoints.web.exposure.include=*
+
+Note:- spring.cloud.config.uri is the config rver address.
+
+2.1) Check the source code of Client_One service how to access variables and how to create REST endpoint to return all the configurations as a List of string
+
+3) Test the new endpoint and check whther you are able to retrieve config values from server as below
+
+	C:\Users\Administrator>curl -X GET http://localhost:8890/ConfigValue
+	["myname = Client_Two","myPlanet = earth_Prod","mysatellite = moon_Prod","mydistance = 5000000"]
+	
+4) Now go to server and modify the value of "mydistance" as 5000005 and save the Client_Two-Prod.properties file.
+
+5) Issue a POST request to server from client to refresh the value [always issue this whenever you are trying to access any value.
+	Thus you'll get latest value from server]
+	
+	C:\Users\Administrator>curl -X POST localhost:8890/actuator/refresh -d {} -H "Content-Type: application/json"
+	
+6) Issue the GET call to the REST endpoint again to get the latest values as below
+
+	C:\Users\Administrator>curl -X GET http://localhost:8890/ConfigValue
+	["myname = Client_Two","myPlanet = earth_Prod","mysatellite = moon_Prod","mydistance = 5000005"]
+
+
