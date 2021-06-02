@@ -3,4 +3,7 @@ This repository contains implementation of a Central configuration server and cl
 store their respective configurations for different profiles (prod, test, dev, sanity etc) in this server configuration and simply fetch those whenever necessary.
 This also has implementation of auto refresh where any chnages in central configuration will be propogated back.
 
+Note: please visit master bracnch for the source code
+
 A detailed implementation logic and steps can be found in Notes file.
+
